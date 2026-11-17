@@ -13,7 +13,7 @@ import uuid
 import os
 import datetime
 
-from data_loader import load_and_chunk_pdf, embed_texts
+from data_loader import load_and_chunk_pdf, embed_texts, make_token_batches
 from vector_db import QdrantStorage
 from custom_types import *
 
@@ -41,18 +41,28 @@ async def rag_ingest_pdf(ctx: inngest.Context):
         chunks = load_and_chunk_pdf(pdf_path)
         return RAGChunkAndSrc(chunks=chunks, source_id=source_id)
 
-    def _upsert(chunks_and_src: RAGChunkAndSrc) -> RAGUpsertResult:
-        chunks = chunks_and_src.chunks
-        source_id = chunks_and_src.source_id
-        vecs = embed_texts(chunks)
-        ids = [str(uuid.uuid5(uuid.NAMESPACE_URL, f"{source_id}:{i}")) for i in range(len(chunks))]
-        payloads = [{"source": source_id, "text": chunks[i]} for i in range(len(chunks))]
+    def _upsert(batch: list[str], source_id: str, offset: int) -> RAGUpsertResult:
+        vecs = embed_texts(batch)
+        ids = [str(uuid.uuid5(uuid.NAMESPACE_URL, f"{source_id}:{offset + i}")) for i in range(len(batch))]
+        payloads = [{"source": source_id, "text": batch[i]} for i in range(len(batch))]
         QdrantStorage().upsert(ids, vecs, payloads)
-        return RAGUpsertResult(ingested=len(chunks))
+        return RAGUpsertResult(ingested=len(batch))
 
     chunks_and_src = await ctx.step.run("load-and-chunk", lambda: _load(ctx), output_type=RAGChunkAndSrc)
-    ingested = await ctx.step.run("embed-and-upsert", lambda: _upsert(chunks_and_src), output_type=RAGUpsertResult)
-    return ingested.model_dump()
+
+    # Split big documents into batches that each fit in ~one minute of embedding quota.
+    # Each batch is its own Inngest step: finished batches are memoized, and if one
+    # fails (e.g. quota exhausted) only that batch is retried.
+    total, offset = 0, 0
+    for n, batch in enumerate(make_token_batches(chunks_and_src.chunks)):
+        result = await ctx.step.run(
+            f"embed-and-upsert-{n}",
+            lambda b=batch, o=offset: _upsert(b, chunks_and_src.source_id, o),
+            output_type=RAGUpsertResult,
+        )
+        total += result.ingested
+        offset += len(batch)
+    return RAGUpsertResult(ingested=total).model_dump()
 
 
 

@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from pathlib import Path
 import time
 
@@ -27,11 +28,14 @@ def save_uploaded_pdf(file) -> Path:
     return file_path
 
 
-async def send_rag_ingest_event(pdf_path: Path) -> None:
+async def send_rag_ingest_event(pdf_path: Path, file_key: str) -> None:
     client = get_inngest_client()
     await client.send(
         inngest.Event(
             name="rag/ingest_pdf",
+            # Inngest dedupes events with the same id (24h), so the same file
+            # isn't ingested twice even across browser refreshes.
+            id=f"ingest-{file_key}",
             data={
                 "pdf_path": str(pdf_path.resolve()),
                 "source_id": pdf_path.name,
@@ -43,14 +47,25 @@ async def send_rag_ingest_event(pdf_path: Path) -> None:
 st.title("Upload a PDF to Ingest")
 uploaded = st.file_uploader("Choose a PDF", type=["pdf"], accept_multiple_files=False)
 
+# Streamlit reruns this whole script on every interaction (e.g. pressing "Ask"),
+# and `uploaded` stays set across reruns. Remember which files were already
+# ingested so we only trigger ingestion once per upload.
+if "ingested_files" not in st.session_state:
+    st.session_state.ingested_files = set()
+
 if uploaded is not None:
-    with st.spinner("Uploading and triggering ingestion..."):
-        path = save_uploaded_pdf(uploaded)
-        # Kick off the event and block until the send completes
-        asyncio.run(send_rag_ingest_event(path))
-        # Small pause for user feedback continuity
-        time.sleep(0.3)
-    st.success(f"Triggered ingestion for: {path.name}")
+    file_key = hashlib.sha256(uploaded.getbuffer()).hexdigest()
+    if file_key not in st.session_state.ingested_files:
+        with st.spinner("Uploading and triggering ingestion..."):
+            path = save_uploaded_pdf(uploaded)
+            # Kick off the event and block until the send completes
+            asyncio.run(send_rag_ingest_event(path, file_key))
+            # Small pause for user feedback continuity
+            time.sleep(0.3)
+        st.session_state.ingested_files.add(file_key)
+        st.success(f"Triggered ingestion for: {uploaded.name}")
+    else:
+        st.info(f"Already ingested: {uploaded.name}")
     st.caption("You can upload another PDF if you like.")
 
 st.divider()
