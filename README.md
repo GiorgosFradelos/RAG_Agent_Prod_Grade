@@ -154,7 +154,7 @@ You can trigger events directly from the Inngest dashboard (**Send event**):
 - **Free-tier throughput:** about 25 chunks per minute. A 500-chunk PDF takes about 20 minutes. Wait for ingestion to finish in the Inngest dashboard before asking about a new document.
 - **Changing the embedding model** changes the vector size. Update `dim` in `vector_db.py` and recreate the `docs` collection.
 
-## Roadmap
+## Moving Forward
 
 - [ ] Hybrid search (BM25 + dense) and reranking
 - [ ] Per-document filtering at query time
