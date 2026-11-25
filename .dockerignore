@@ -1,0 +1,13 @@
+.env
+.venv
+.git
+.idea
+.DS_Store
+__pycache__
+*.pyc
+uploads/
+data/
+qdrant_storage/
+docs/
+tests/
+run_server_commands

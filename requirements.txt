@@ -94,6 +94,7 @@ pyasn1-modules==0.4.2
 pycparser==3.12 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
 pydantic==2.14.3
 pydantic-core==2.50.4
+pydantic-settings==2.16.3
 pydeck==0.9.3
 pyparsing==3.3.3
 pypdf==6.21.4

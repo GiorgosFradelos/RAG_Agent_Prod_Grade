@@ -1,0 +1,56 @@
+[project]
+name = "rag-production-agent"
+version = "0.2.0"
+description = "Production-grade RAG over PDFs: FastAPI, Inngest, Qdrant, Gemini and Groq."
+readme = "README.md"
+authors = [
+    { name = "YorgosFradelos", email = "gi.fra1997@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.163.1",
+    "groq>=1.7.0",
+    "inngest>=0.5.20",
+    "llama-index-core>=0.14.26",
+    "llama-index-embeddings-gemini>=0.4.2",
+    "llama-index-llms-groq>=0.7.0",
+    "llama-index-readers-file>=0.8.0",
+    "pydantic-settings>=2.16.3",
+    "python-multipart>=0.0.34",
+    "qdrant-client>=1.20.0",
+    "requests>=2.34.2",
+    "streamlit>=1.67.0",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+rag-api = "rag_production_agent.api:run"
+
+[project.optional-dependencies]
+azure = [
+    "llama-index-embeddings-azure-openai>=0.7.0",
+    "llama-index-llms-azure-openai>=0.7.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.8,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.6",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: needs external services (Qdrant)"]
+addopts = "-m 'not integration'"
